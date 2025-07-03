@@ -27,9 +27,8 @@ public class JobLog {
     private Long id;
 
     // Each log must be associated with a Job
-    @ManyToOne(optional = false)
     @JoinColumn(name = "job_id", nullable = false)
-    private Job job;
+    private Long jobId;
 
     @Builder.Default
     @Column(name = "run_timestamp", nullable = false)
@@ -55,4 +54,5 @@ public class JobLog {
     @Lob
     @Column(name = "error_message")
     private String errorMessage;
+
 }

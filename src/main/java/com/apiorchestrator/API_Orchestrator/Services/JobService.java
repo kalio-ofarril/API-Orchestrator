@@ -5,21 +5,22 @@ import com.apiorchestrator.API_Orchestrator.Model.Entities.JobLog;
 import com.apiorchestrator.API_Orchestrator.Model.Repositories.JobLogRepository;
 import com.apiorchestrator.API_Orchestrator.Model.Repositories.JobRepository;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class JobService {
 
-    @Autowired
-    private JobRepository jobRepository;
+    private final JobRepository jobRepository;
+    private final JobLogRepository jobLogRepository;
+    private final JobSchedulerService jobSchedulerService;
 
-    @Autowired
-    private JobLogRepository jobLogRepository;
+    public JobService(JobRepository jobRepository, JobLogRepository jobLogRepository, JobSchedulerService jobSchedulerService){
+        this.jobRepository = jobRepository;
+        this.jobLogRepository = jobLogRepository;
+        this.jobSchedulerService = jobSchedulerService;
+    }
 
     public List<Job> getAllJobs() {
         return jobRepository.findAll();
@@ -31,7 +32,9 @@ public class JobService {
     }
 
     public Job createJob(Job job) {
-        return jobRepository.save(job);
+        jobRepository.save(job);
+        scheduleJob(job);
+        return job;
     }
 
     public Job updateJob(Long id, Job jobDetails) {
@@ -46,16 +49,28 @@ public class JobService {
         existingJob.setActive(jobDetails.isActive());
         existingJob.setLastRunSuccessful(jobDetails.getLastRunSuccessful());
 
-        return jobRepository.save(existingJob);
+        jobRepository.save(existingJob);
+
+        scheduleJob(existingJob);
+        return existingJob; 
     }
 
     public void deleteJob(Long id) {
+        jobSchedulerService.unscheduleJob(id); 
         jobRepository.deleteById(id);
     }
 
     public void triggerJob(Long id) {
         Job job = getJobById(id);
         // Logic to trigger the job manually goes here (e.g., make HTTP call, log response, etc.)
+    }
+
+    public void scheduleJob(Job job){
+        if(job.isActive()){
+            jobSchedulerService.scheduleJob(job);
+        }else{
+            jobSchedulerService.unscheduleJob(job.getId());
+        }
     }
 
     public List<JobLog> getJobLogs(Long jobId) {
