@@ -27,15 +27,17 @@ public class JobSchedulerService {
     private final JobRepository jobRepository;
     private final JobLogRepository jobLogRepository;
     private final TaskScheduler taskScheduler;
+    private final JobLockService jobLockService;
 
     private final Map<Long, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
 
     public JobSchedulerService(JobRepository jobRepository, TaskScheduler taskScheduler,
-            JobLogRepository jobLogRepository, WebClient webClient) {
+            JobLogRepository jobLogRepository, WebClient webClient, JobLockService jobLockService) {
         this.jobRepository = jobRepository;
         this.taskScheduler = taskScheduler;
         this.jobLogRepository = jobLogRepository;
         this.webClient = webClient;
+        this.jobLockService = jobLockService;
     }
 
     @PostConstruct
@@ -68,49 +70,46 @@ public class JobSchedulerService {
         }
     }
 
-    private void runJob(Job job){
+    public void triggerJob(Job job){
+        runJob(job);
+    }
+
+    private void runJob(Job job) {
         LocalDateTime runTime = LocalDateTime.now();
 
-        try{
-            log.info("Running job [{}] at {}", job.getName(), runTime);
-            JobLog log = new JobLog();
-            log.setJobId(job.getId());
-            log.setRunTimestamp(LocalDateTime.now());
-
-            webClient.get()
-            .uri(job.getEndpoint())
-            .retrieve()
-            .toEntity(String.class)
-            .doOnSuccess(response -> {
-                log.setStatus("SUCCESS");
-                log.setResponseCode(response.getStatusCode().value());
-                log.setResponseBody(response.getBody());
-                job.setLastRunSuccessful(true);
-            })
-            .doOnError(ex -> {
-                log.setStatus("FAILED");
-                log.setResponseCode(500);
-                log.setErrorMessage(ex.getMessage());
-                job.setLastRunSuccessful(false);
-            })
-            .doFinally(signal -> {
-                jobLogRepository.save(log);
-                jobRepository.save(job);
-            })
-            .subscribe();
-
-          
-        } catch (Exception ex){
-            log.error("Job [{}] failed: {}", job.getName(), ex.getMessage());
-
-            JobLog.builder()
-                .jobId(job.getId())
-                .runTimestamp(runTime)
-                .status("FAILED")
-                .errorMessage(ex.getMessage())
-                .responseCode(501)
-                .build();
+        if (!jobLockService.acquireLock(job.getId(), 60)) {
+            log.warn("Job [{}] skipped: lock not acquired", job.getName());
+            return;
         }
+
+        JobLog logEntry = new JobLog();
+        logEntry.setJobId(job.getId());
+        logEntry.setRunTimestamp(runTime);
+
+        webClient.get()
+                .uri(job.getEndpoint())
+                .retrieve()
+                .toEntity(String.class)
+                .doOnSuccess(response -> {
+                    log.info("Job [{}] succeeded", job.getName());
+                    logEntry.setStatus("SUCCESS");
+                    logEntry.setResponseCode(response.getStatusCode().value());
+                    logEntry.setResponseBody(response.getBody());
+                    job.setLastRunSuccessful(true);
+                })
+                .doOnError(error -> {
+                    log.error("Job [{}] failed: {}", job.getName(), error.getMessage());
+                    logEntry.setStatus("FAILED");
+                    logEntry.setResponseCode(500);
+                    logEntry.setErrorMessage(error.getMessage());
+                    job.setLastRunSuccessful(false);
+                })
+                .doFinally(signal -> {
+                    jobLogRepository.save(logEntry);
+                    jobRepository.save(job);
+                    jobLockService.releaseLock(job.getId());
+                })
+                .subscribe();
     }
 
 }
