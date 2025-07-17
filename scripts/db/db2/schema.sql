@@ -44,3 +44,11 @@ CREATE TABLE job_logs (
 );
 
 CREATE INDEX idx_job_id ON job_logs (job_id);
+
+-- =========================================
+-- job_locks table
+-- =========================================
+CREATE TABLE job_locks (
+    job_id BIGINT PRIMARY KEY,
+    locked_until TIMESTAMP
+);

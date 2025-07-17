@@ -5,11 +5,14 @@ import com.apiorchestrator.API_Orchestrator.Model.Entities.JobLog;
 import com.apiorchestrator.API_Orchestrator.Model.Repositories.JobLogRepository;
 import com.apiorchestrator.API_Orchestrator.Model.Repositories.JobRepository;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
+@Slf4j
 public class JobService {
 
     private final JobRepository jobRepository;
@@ -62,7 +65,8 @@ public class JobService {
 
     public void triggerJob(Long id) {
         Job job = getJobById(id);
-        // Logic to trigger the job manually goes here (e.g., make HTTP call, log response, etc.)
+        log.info("Manually triggering job [{}] via API", job.getName());
+        jobSchedulerService.triggerJob(job);
     }
 
     public void scheduleJob(Job job){
