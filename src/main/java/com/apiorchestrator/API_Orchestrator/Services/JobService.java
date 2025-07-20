@@ -18,11 +18,13 @@ public class JobService {
     private final JobRepository jobRepository;
     private final JobLogRepository jobLogRepository;
     private final JobSchedulerService jobSchedulerService;
+    private final JobGroupService jobGroupService;
 
-    public JobService(JobRepository jobRepository, JobLogRepository jobLogRepository, JobSchedulerService jobSchedulerService){
+    public JobService(JobRepository jobRepository, JobLogRepository jobLogRepository, JobSchedulerService jobSchedulerService, JobGroupService jobGroupService){
         this.jobRepository = jobRepository;
         this.jobLogRepository = jobLogRepository;
         this.jobSchedulerService = jobSchedulerService;
+        this.jobGroupService = jobGroupService;
     }
 
     public List<Job> getAllJobs() {
@@ -37,6 +39,7 @@ public class JobService {
     public Job createJob(Job job) {
         jobRepository.save(job);
         scheduleJob(job);
+        jobGroupService.manageGroup(job.getGroupTag());
         return job;
     }
 
