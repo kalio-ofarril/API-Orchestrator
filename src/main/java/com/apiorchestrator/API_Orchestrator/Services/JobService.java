@@ -5,9 +5,13 @@ import com.apiorchestrator.API_Orchestrator.Model.Entities.JobLog;
 import com.apiorchestrator.API_Orchestrator.Model.Repositories.JobLogRepository;
 import com.apiorchestrator.API_Orchestrator.Model.Repositories.JobRepository;
 
+import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 
+import org.apache.coyote.BadRequestException;
+import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.util.List;
 
@@ -20,7 +24,8 @@ public class JobService {
     private final JobSchedulerService jobSchedulerService;
     private final JobGroupService jobGroupService;
 
-    public JobService(JobRepository jobRepository, JobLogRepository jobLogRepository, JobSchedulerService jobSchedulerService, JobGroupService jobGroupService){
+    public JobService(JobRepository jobRepository, JobLogRepository jobLogRepository,
+            JobSchedulerService jobSchedulerService, JobGroupService jobGroupService) {
         this.jobRepository = jobRepository;
         this.jobLogRepository = jobLogRepository;
         this.jobSchedulerService = jobSchedulerService;
@@ -36,11 +41,19 @@ public class JobService {
                 .orElseThrow(() -> new IllegalArgumentException("Job not found with id: " + id));
     }
 
-    public Job createJob(Job job) {
-        jobRepository.save(job);
-        scheduleJob(job);
-        jobGroupService.manageGroup(job.getGroupTag());
-        return job;
+    @Transactional
+    public Job createJob(Job job) throws BadRequestException {
+        try {
+            validateCronExpression(job.getCronExpression());
+            jobGroupService.manageGroup(job.getGroupTag());
+            jobRepository.save(job);
+            scheduleJob(job);
+            return job;
+        } catch (IllegalArgumentException ex) {
+            log.error("Invalid cron expression", ex);
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            throw new BadRequestException("Invalid cron expression");
+        }
     }
 
     public Job updateJob(Long id, Job jobDetails) {
@@ -58,11 +71,11 @@ public class JobService {
         jobRepository.save(existingJob);
 
         scheduleJob(existingJob);
-        return existingJob; 
+        return existingJob;
     }
 
     public void deleteJob(Long id) {
-        jobSchedulerService.unscheduleJob(id); 
+        jobSchedulerService.unscheduleJob(id);
         jobRepository.deleteById(id);
     }
 
@@ -72,15 +85,20 @@ public class JobService {
         jobSchedulerService.triggerJob(job);
     }
 
-    public void scheduleJob(Job job){
-        if(job.isActive()){
+    public void scheduleJob(Job job) {
+        if (job.isActive()) {
             jobSchedulerService.scheduleJob(job);
-        }else{
+        } else {
             jobSchedulerService.unscheduleJob(job.getId());
         }
     }
 
     public List<JobLog> getJobLogs(Long jobId) {
-        return jobLogRepository.findByJobId(jobId);
+        return jobLogRepository.findTop10ByJobIdOrderByRunTimestampDesc(jobId);
     }
+
+    public void validateCronExpression(String expression) {
+        new CronTrigger(expression); 
+    }
+
 }
