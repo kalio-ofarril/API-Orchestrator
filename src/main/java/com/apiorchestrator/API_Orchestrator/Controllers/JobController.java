@@ -5,6 +5,8 @@ import com.apiorchestrator.API_Orchestrator.Services.JobService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+
+import org.apache.coyote.BadRequestException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -33,7 +35,7 @@ public class JobController {
 
     @PostMapping
     @Operation(summary = "Create a new job")
-    public ResponseEntity<Job> createJob(@RequestBody Job job) {
+    public ResponseEntity<Job> createJob(@RequestBody Job job) throws BadRequestException {
         return ResponseEntity.ok(jobService.createJob(job));
     }
 

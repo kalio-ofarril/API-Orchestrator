@@ -40,7 +40,7 @@ public class DevDataLoader {
                 .name("Mock Success Job")
                 .description("Returns 200 OK every 5 seconds")
                 .endpoint("http://httpbin.org/status/200")
-                .cronExpression("*/10 * * * * *")  // every 5 seconds
+                .cronExpression("*/60 * * * * *")  // every 5 seconds
                 .groupTag("dummysite jobs")
                 .owner("kalio")
                 .isActive(true)
@@ -51,7 +51,7 @@ public class DevDataLoader {
                 .name("Mock Failure Job")
                 .description("Returns 500 Error every 10 seconds")
                 .endpoint("http://httpbin.org/status/500")
-                .cronExpression("*/30 * * * * *") // every 10 seconds
+                .cronExpression("*/60 * * * * *") // every 10 seconds
                 .groupTag("fakesite jobs")
                 .owner("kalio")
                 .isActive(true)

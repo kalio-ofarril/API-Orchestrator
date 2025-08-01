@@ -7,5 +7,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.apiorchestrator.API_Orchestrator.Model.Entities.JobLog;
 
 public interface JobLogRepository extends JpaRepository<JobLog, Long> {
+    
     List<JobLog> findByJobId(Long jobId);
+
+    List<JobLog> findTop10ByJobIdOrderByRunTimestampDesc(Long jobId);
+
 }
